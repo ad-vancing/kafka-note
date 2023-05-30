@@ -58,6 +58,8 @@ public class ProducerConfig extends AbstractConfig {
     private static final ConfigDef CONFIG;
 
     /** <code>bootstrap.servers</code> */
+    // Kafka集群节点列表(全部 or 部分均可)，用于KafkaProducer初始获取Server端元数据(如完整节点列表、Partition分布等等)；
+    // 之前是zk 地址
     public static final String BOOTSTRAP_SERVERS_CONFIG = CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG;
 
     /** <code>client.dns.lookup</code> */
@@ -114,6 +116,7 @@ public class ProducerConfig extends AbstractConfig {
             + "Note: this setting has no effect if a custom partitioner is used.";
 
     /** <code>acks</code> */
+    // 指定服务端有多少个副本完成同步，才算成功。0，1，all
     public static final String ACKS_CONFIG = "acks";
     private static final String ACKS_DOC = "The number of acknowledgments the producer requires the leader to have received before considering a request complete. This controls the "
                                            + " durability of records that are sent. The following settings are allowed: "
@@ -247,6 +250,7 @@ public class ProducerConfig extends AbstractConfig {
                                                                             + " If conflicting configurations are set and idempotence is not explicitly enabled, idempotence is disabled. ";
 
     /** <code>retries</code> */
+    // 重试次数
     public static final String RETRIES_CONFIG = CommonClientConfigs.RETRIES_CONFIG;
     private static final String RETRIES_DOC = "Setting a value greater than zero will cause the client to resend any record whose send fails with a potentially transient error."
             + " Note that this retry is no different than if the client resent the record upon receiving the error."

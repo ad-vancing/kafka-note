@@ -103,6 +103,10 @@ public class Producer extends Thread {
         }
     }
 
+    /**
+     *
+     * @return
+     */
     public KafkaProducer<Integer, String> createKafkaProducer() {
         Properties props = new Properties();
         // bootstrap server config is required for producer to connect to brokers

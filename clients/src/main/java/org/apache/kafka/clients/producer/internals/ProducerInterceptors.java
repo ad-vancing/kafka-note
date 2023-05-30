@@ -53,6 +53,9 @@ public class ProducerInterceptors<K, V> implements Closeable {
      *
      * @param record the record from client
      * @return producer record to send to topic/partition
+     *
+     * 生产者拦截器, 允许你在发送消息前以及消息提交成功后植入你的拦截器逻辑；
+     * 并支持链的方式，即你可以将一组拦截器串连成一个大的拦截器，Kafka 会按照添加顺序依次执行拦截器逻辑。
      */
     public ProducerRecord<K, V> onSend(ProducerRecord<K, V> record) {
         ProducerRecord<K, V> interceptRecord = record;

@@ -56,6 +56,7 @@ import org.apache.kafka.common.utils.Time;
 import org.slf4j.Logger;
 
 /**
+ * queue
  * This class acts as a queue that accumulates records into {@link MemoryRecords}
  * instances to be sent to the server.
  * <p>
@@ -79,6 +80,7 @@ public class RecordAccumulator {
     private final BufferPool free;
     private final Time time;
     private final ApiVersions apiVersions;
+    // topic
     private final ConcurrentMap<String /*topic*/, TopicInfo> topicInfoMap = new CopyOnWriteMap<>();
     private final ConcurrentMap<Integer /*nodeId*/, NodeLatencyStats> nodeStats = new CopyOnWriteMap<>();
     private final IncompleteBatches incomplete;
@@ -269,6 +271,8 @@ public class RecordAccumulator {
      *                        running the partitioner's onNewBatch method before trying to append again
      * @param nowMs The current time, in milliseconds
      * @param cluster The cluster metadata
+     *
+     *
      */
     public RecordAppendResult append(String topic,
                                      int partition,

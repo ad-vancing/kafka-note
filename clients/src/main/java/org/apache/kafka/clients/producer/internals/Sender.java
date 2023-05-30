@@ -233,6 +233,7 @@ public class Sender implements Runnable {
 
     /**
      * The main run loop for the sender thread
+     *  sender thread
      */
     @Override
     public void run() {

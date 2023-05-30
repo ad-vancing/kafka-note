@@ -297,6 +297,16 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
      * <p>
      * Note: after creating a {@code KafkaProducer} you must always {@link #close()} it to avoid resource leaks.
      * @param properties   The producer configs
+     *
+     *
+     *  eg0：
+     *         Properties config = new Properties();
+     *         config.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
+     *                 "127.0.0.1:9092,127.0.0.1:9093");
+     *         config.setProperty(ProducerConfig.ACKS_CONFIG, "-1");
+     *         config.setProperty(ProducerConfig.RETRIES_CONFIG, "3");
+     *         KafkaProducer<String, String> producer = new KafkaProducer<>(config);
+     *
      */
     public KafkaProducer(Properties properties) {
         this(properties, null, null);
@@ -335,6 +345,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
     }
 
     // visible for testing
+    //  KafkaProducer contructor
     @SuppressWarnings("unchecked")
     KafkaProducer(ProducerConfig config,
                   Serializer<K> keySerializer,
@@ -346,9 +357,9 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
         try {
             this.producerConfig = config;
             this.time = time;
-
+            // 1、transactionId
             String transactionalId = config.getString(ProducerConfig.TRANSACTIONAL_ID_CONFIG);
-
+            //2、clientId
             this.clientId = config.getString(ProducerConfig.CLIENT_ID_CONFIG);
 
             LogContext logContext;
@@ -360,6 +371,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             log.trace("Starting the Kafka producer");
 
             Map<String, String> metricTags = Collections.singletonMap("client-id", clientId);
+            //3、monitor
             MetricConfig metricConfig = new MetricConfig().samples(config.getInt(ProducerConfig.METRICS_NUM_SAMPLES_CONFIG))
                     .timeWindow(config.getLong(ProducerConfig.METRICS_SAMPLE_WINDOW_MS_CONFIG), TimeUnit.MILLISECONDS)
                     .recordLevel(Sensor.RecordingLevel.forName(config.getString(ProducerConfig.METRICS_RECORDING_LEVEL_CONFIG)))
@@ -369,6 +381,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
                     config.originalsWithPrefix(CommonClientConfigs.METRICS_CONTEXT_PREFIX));
             this.metrics = new Metrics(metricConfig, reporters, time, metricsContext);
             this.producerMetrics = new KafkaProducerMetrics(metrics);
+            //4、partitioner
             this.partitioner = config.getConfiguredInstance(
                     ProducerConfig.PARTITIONER_CLASS_CONFIG,
                     Partitioner.class,
@@ -376,6 +389,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             warnIfPartitionerDeprecated();
             this.partitionerIgnoreKeys = config.getBoolean(ProducerConfig.PARTITIONER_IGNORE_KEYS_CONFIG);
             long retryBackoffMs = config.getLong(ProducerConfig.RETRY_BACKOFF_MS_CONFIG);
+            //5、keySerializer
             if (keySerializer == null) {
                 this.keySerializer = config.getConfiguredInstance(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
                                                                                          Serializer.class);
@@ -392,7 +406,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
                 config.ignore(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG);
                 this.valueSerializer = valueSerializer;
             }
-
+            //6、Interceptor
             List<ProducerInterceptor<K, V>> interceptorList = (List) config.getConfiguredInstances(
                     ProducerConfig.INTERCEPTOR_CLASSES_CONFIG,
                     ProducerInterceptor.class,
@@ -403,6 +417,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
                 this.interceptors = new ProducerInterceptors<>(interceptorList);
             ClusterResourceListeners clusterResourceListeners = configureClusterResourceListeners(this.keySerializer,
                     this.valueSerializer, interceptorList, reporters);
+            //7、other config
             this.maxRequestSize = config.getInt(ProducerConfig.MAX_REQUEST_SIZE_CONFIG);
             this.totalMemorySize = config.getLong(ProducerConfig.BUFFER_MEMORY_CONFIG);
             this.compressionType = CompressionType.forName(config.getString(ProducerConfig.COMPRESSION_TYPE_CONFIG));
@@ -415,6 +430,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             // There is no need to do work required for adaptive partitioning, if we use a custom partitioner.
             boolean enableAdaptivePartitioning = partitioner == null &&
                 config.getBoolean(ProducerConfig.PARTITIONER_ADPATIVE_PARTITIONING_ENABLE_CONFIG);
+            // 分区缓存
             RecordAccumulator.PartitionerConfig partitionerConfig = new RecordAccumulator.PartitionerConfig(
                 enableAdaptivePartitioning,
                 config.getLong(ProducerConfig.PARTITIONER_AVAILABILITY_TIMEOUT_MS_CONFIG)
@@ -435,10 +451,11 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
                     apiVersions,
                     transactionManager,
                     new BufferPool(this.totalMemorySize, batchSize, metrics, time, PRODUCER_METRIC_GROUP_NAME));
-
+            // kafka cluster
             List<InetSocketAddress> addresses = ClientUtils.parseAndValidateAddresses(
                     config.getList(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG),
                     config.getString(ProducerConfig.CLIENT_DNS_LOOKUP_CONFIG));
+            //metadata
             if (metadata != null) {
                 this.metadata = metadata;
             } else {
@@ -451,9 +468,11 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
                 this.metadata.bootstrap(addresses);
             }
             this.errors = this.metrics.sensor("errors");
+            // sender 线程
             this.sender = newSender(logContext, kafkaClient, this.metadata);
             String ioThreadName = NETWORK_THREAD_PREFIX + " | " + clientId;
             this.ioThread = new KafkaThread(ioThreadName, this.sender, true);
+            // 启动
             this.ioThread.start();
             config.logUnused();
             AppInfoParser.registerAppInfo(JMX_PREFIX, clientId, metrics, time.milliseconds());
@@ -505,8 +524,10 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
     }
 
     // visible for testing
+    // 创建 sender 线程
     Sender newSender(LogContext logContext, KafkaClient kafkaClient, ProducerMetadata metadata) {
         int maxInflightRequests = producerConfig.getInt(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION);
+        //超时时间
         int requestTimeoutMs = producerConfig.getInt(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG);
         ChannelBuilder channelBuilder = ClientUtils.createChannelBuilder(producerConfig, time, logContext);
         ProducerMetrics metricsRegistry = new ProducerMetrics(this.metrics);
@@ -529,19 +550,21 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
                 apiVersions,
                 throttleTimeSensor,
                 logContext);
-
+        // 应答级别
         short acks = Short.parseShort(producerConfig.getString(ProducerConfig.ACKS_CONFIG));
         return new Sender(logContext,
                 client,
                 metadata,
                 this.accumulator,
                 maxInflightRequests == 1,
+                //单条消息最大值
                 producerConfig.getInt(ProducerConfig.MAX_REQUEST_SIZE_CONFIG),
                 acks,
                 producerConfig.getInt(ProducerConfig.RETRIES_CONFIG),
                 metricsRegistry.senderMetrics,
                 time,
                 requestTimeoutMs,
+                //重试次数
                 producerConfig.getLong(ProducerConfig.RETRY_BACKOFF_MS_CONFIG),
                 this.transactionManager,
                 apiVersions);
@@ -981,6 +1004,8 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 
     /**
      * Implementation of asynchronously send a record to a topic.
+     *
+     * doSend
      */
     private Future<RecordMetadata> doSend(ProducerRecord<K, V> record, Callback callback) {
         // Append callback takes care of the following:
@@ -1004,6 +1029,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             long remainingWaitMs = Math.max(0, maxBlockTimeMs - clusterAndWaitTime.waitedOnMetadataMs);
             Cluster cluster = clusterAndWaitTime.cluster;
             byte[] serializedKey;
+            // serialized
             try {
                 serializedKey = keySerializer.serialize(record.topic(), record.headers(), record.key());
             } catch (ClassCastException cce) {
@@ -1023,6 +1049,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             // Try to calculate partition, but note that after this call it can be RecordMetadata.UNKNOWN_PARTITION,
             // which means that the RecordAccumulator would pick a partition using built-in logic (which may
             // take into account broker load, the amount of data produced to each partition, etc.).
+            //partition
             int partition = partition(record, serializedKey, serializedValue, cluster);
 
             setReadOnly(record.headers());
@@ -1038,6 +1065,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 
             // Append the record to the accumulator.  Note, that the actual partition may be
             // calculated there and can be accessed via appendCallbacks.topicPartition.
+            //RecordAccumulator 缓存
             RecordAccumulator.RecordAppendResult result = accumulator.append(record.topic(), partition, timestamp, serializedKey,
                     serializedValue, headers, appendCallbacks, remainingWaitMs, abortOnNewBatch, nowMs, cluster);
             assert appendCallbacks.getPartition() != RecordMetadata.UNKNOWN_PARTITION;
@@ -1475,6 +1503,8 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
      *  - user callback
      *  - interceptor callbacks
      *  - partition callback
+     *
+     *   the obj to be sent
      */
     private class AppendCallbacks<K, V> implements RecordAccumulator.AppendCallbacks {
         private final Callback userCallback;

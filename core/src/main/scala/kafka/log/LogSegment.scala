@@ -45,10 +45,10 @@ import scala.math._
  *
  * A segment with a base offset of [base_offset] would be stored in two files, a [base_offset].index and a [base_offset].log file.
  *
- * @param log The file records containing log entries
- * @param lazyOffsetIndex The offset index
+ * @param log The file records containing log entries 数据
+ * @param lazyOffsetIndex The offset index  分段索引文件
  * @param lazyTimeIndex The timestamp index
- * @param txnIndex The transaction index
+ * @param txnIndex The transaction index 事务索引
  * @param baseOffset A lower bound on the offsets in this segment
  * @param indexIntervalBytes The approximate number of bytes between entries in the index
  * @param rollJitterMs The maximum random jitter subtracted from the scheduled segment roll time
